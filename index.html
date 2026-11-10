@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>淡江飛行戰機：校園植物防衛大戰</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; user-select: none; touch-action: none; font-size: 16px; }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
+            50% { box-shadow: 0 0 30px rgba(16, 185, 129, 0.8); }
+        }
+        .turret-glow { animation: pulse-glow 2s infinite; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-950 via-sky-950 to-indigo-950 text-slate-100 min-h-screen flex flex-col items-center justify-between p-4 md:p-6 overflow-hidden">
+
+    <!-- 頂部資訊列 -->
+    <header class="w-full max-w-5xl bg-white/10 backdrop-blur-md shadow-xl rounded-2xl p-4 md:p-5 flex justify-between items-center border border-white/20">
+        <div class="flex items-center space-x-3">
+            <div class="bg-sky-500 text-white p-3 rounded-xl text-2xl">🛸🌿</div>
+            <div>
+                <h1 class="text-xl md:text-2xl font-black text-white tracking-wide">淡江飛行戰機：校園植物防衛</h1>
+                <p class="text-xs md:text-sm text-sky-300 font-medium">Tamkang Eco-Fighter Shooter Game</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-4 bg-black/40 px-5 py-2 rounded-xl border border-white/10 text-sm">
+            <div class="text-center px-1">
+                <span class="block text-[11px] text-sky-400 font-bold uppercase">戰機得分</span>
+                <span id="score-val" class="text-base md:text-lg font-black text-amber-400">0 分</span>
+            </div>
+            <div class="h-6 w-px bg-white/20"></div>
+            <div class="text-center px-1">
+                <span class="block text-[11px] text-emerald-400 font-bold uppercase">通關進度</span>
+                <span id="targets-val" class="text-base md:text-lg font-black text-emerald-300">0 / 10</span>
+            </div>
+            <div class="h-6 w-px bg-white/20"></div>
+            <div class="text-center px-1">
+                <span class="block text-[11px] text-rose-400 font-bold uppercase">戰機生命</span>
+                <span id="hp-val" class="text-base md:text-lg font-black text-rose-300">100%</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主遊戲畫布區域 -->
+    <main class="w-full max-w-5xl flex-grow flex flex-col items-center justify-center my-2 relative">
+        
+        <div id="game-container" class="w-full h-[500px] bg-slate-950/90 border-2 border-sky-500/40 rounded-3xl relative overflow-hidden shadow-2xl">
+            
+            <!-- 星空與山坡背景 -->
+            <div class="absolute inset-0 opacity-20 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:24px_24px]"></div>
+            <div class="absolute bottom-0 inset-x-0 h-16 bg-gradient-to-t from-emerald-900/40 to-transparent flex items-end justify-center pb-2">
+                <span class="text-xs text-emerald-300 font-bold tracking-widest uppercase">🌿 淡江大學大屯山生態防衛線 🌿</span>
+            </div>
+
+            <!-- 飛行戰機 (玩家操控) -->
+            <div id="player-ship" class="absolute bottom-4 left-1/2 -translate-x-1/2 w-16 h-14 flex flex-col items-center justify-center cursor-pointer z-20 transition-transform duration-75">
+                <div class="text-4xl filter drop-shadow-[0_0_12px_rgba(56,189,248,0.8)]">🛸</div>
+                <div class="w-10 h-2 bg-sky-400 rounded-full mt-0.5 animate-pulse"></div>
+            </div>
+
+            <!-- 目標植物群落 (由 JS 動態生成並移動) -->
+            <div id="enemies-layer" class="absolute inset-0 z-10 pointer-events-none"></div>
+
+            <!-- 發射出的雷射光束層 -->
+            <div id="lasers-layer" class="absolute inset-0 z-10 pointer-events-none"></div>
+
+            <!-- 遊戲開始/結算遮罩 -->
+            <div id="screen-overlay" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md z-40 flex flex-col items-center justify-center text-center p-6">
+                <div class="bg-slate-900 text-slate-100 p-8 rounded-3xl max-w-lg shadow-2xl border-2 border-sky-500 turret-glow">
+                    <div class="text-6xl mb-4">🛸🌿</div>
+                    <h2 class="text-3xl font-black mb-3 text-white">淡江飛行戰機出動！</h2>
+                    <p class="text-sm md:text-base text-slate-300 mb-6 leading-relaxed">
+                        使用鍵盤 <kbd class="px-2.5 py-1 bg-slate-800 border border-slate-700 rounded text-sky-400 font-mono">←</kbd> <kbd class="px-2.5 py-1 bg-slate-800 border border-slate-700 rounded text-sky-400 font-mono">→</kbd> 或滑鼠左右拖曳來移動戰機，按下 <kbd class="px-2.5 py-1 bg-slate-800 border border-slate-700 rounded text-amber-400 font-mono">空白鍵 Space</kbd> 或點擊畫面發射能量雷射！題庫擴充至 20 題，隨機擊落並正確回答 **10 題** 即可通關！
+                    </p>
+                    <button onclick="initGame()" class="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3.5 px-6 rounded-2xl shadow-lg transition duration-200 text-base md:text-lg">
+                        啟動戰機 🚀
+                    </button>
+                </div>
+            </div>
+
+            <!-- 戰鬥中即時問答彈窗 -->
+            <div id="combat-quiz" class="absolute inset-0 bg-slate-950/95 backdrop-blur-md z-50 flex flex-col items-center justify-center p-6 hidden">
+                <div class="bg-slate-900 border-2 border-sky-500/80 rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl text-center">
+                    <div id="quiz-emoji" class="text-6xl mb-3">🌳</div>
+                    <h3 id="quiz-heading" class="text-base md:text-lg font-black text-sky-300 mb-2">目標锁定：植物生態考驗</h3>
+                    <p id="quiz-text" class="text-sm md:text-base text-slate-200 mb-6 leading-relaxed">請回答正確的防護策略！</p>
+                    <div id="quiz-options" class="space-y-3 w-full"></div>
+                    <div id="quiz-feedback" class="mt-4 text-base font-bold hidden"></div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- 底部操作說明與 AI 研究所 -->
+    <footer class="w-full max-w-5xl flex flex-col md:flex-row justify-between items-center text-xs md:text-sm text-slate-300 gap-3">
+        <div class="flex items-center space-x-2 bg-white/5 px-4 py-2.5 rounded-xl border border-white/10">
+            <span>🎮 控制方式：</span>
+            <span class="text-sky-300 font-bold">左右鍵移動</span> | 
+            <span class="text-amber-300 font-bold">空白鍵發射</span> 或直接點擊畫面！
+        </div>
+        <button onclick="fetchAiTip()" class="bg-indigo-700 hover:bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-xl shadow transition border border-indigo-500 flex items-center space-x-2 text-sm">
+            <span>✨</span><span>Gemini 淡江生態戰情提示</span>
+        </button>
+    </footer>
+
+    <!-- AI 提示對話框 (彈出式) -->
+    <div id="ai-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border-2 border-indigo-500 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl relative">
+            <h3 class="text-base md:text-lg font-bold text-indigo-300 mb-3 flex items-center">
+                <span class="mr-2 text-xl">💡</span> Gemini 淡江校園生態戰情分析
+            </h3>
+            <p id="ai-text" class="text-sm text-slate-200 leading-relaxed bg-black/30 p-4 rounded-2xl border border-white/10 mb-6">
+                正在連線淡江生態資料庫...
+            </p>
+            <button onclick="document.getElementById('ai-modal').classList.add('hidden')" class="w-full bg-indigo-700 hover:bg-indigo-600 text-white font-bold py-3 rounded-xl text-sm">
+                關閉戰情提示
+            </button>
+        </div>
+    </div>
+
+    <!-- 遊戲邏輯與戰機控制 -->
+    <script>
+        const plantTargets = [
+            { id: 0, name: "宮燈榕樹", icon: "🌳", location: "宮燈大道", desc: "古色古香的宮燈大道兩側矗立著百年榕樹群。面對強烈東北季風與山坡地水土流失，正確的養護方式是？", choices: [{ text: "增施有機堆肥並進行深層根系固土保水", correct: true }, { text: "噴灑強力化學除草劑以防雜草搶養分", correct: false }], active: true, x: 12, y: 12, speed: 0.65 },
+            { id: 1, name: "觀音座蓮", icon: "🌿", location: "麗澤湖畔", desc: "麗澤湖濕地陰涼處生長著台灣原生大型蕨類「觀音座蓮」。外來入侵種「小花蔓澤蘭」正在攀爬，你該怎麼做？", choices: [{ text: "手動清除外來蔓澤蘭，確保原生蕨類享有陽光", correct: true }, { text: "不管它，讓外來種與本土蕨類自由競爭", correct: false }], active: true, x: 30, y: 22, speed: 0.55 },
+            { id: 2, name: "克難杜鵑", icon: "🌺", location: "克難坡", desc: "春季綻放的杜鵑花點綴了克難坡石階。近期面臨乾旱威脅，快遞員該如何幫忙？", choices: [{ text: "利用校園雨水回收系統灌溉並覆蓋保濕落葉", correct: true }, { text: "使用大量自來水噴灑並施加強力催花劑", correct: false }], active: true, x: 50, y: 15, speed: 0.7 },
+            { id: 3, name: "台灣海桐", icon: "🍃", location: "商管大樓", desc: "商管大樓周邊風勢強勁，本土灌木「台灣海桐」扮演了天然防風綠籬角色。該如何維護？", choices: [{ text: "適度修剪枯枝並補充磷鉀肥增強枝幹韌性", correct: true }, { text: "將海桐全部砍除改建機車停車位", correct: false }], active: true, x: 70, y: 10, speed: 0.5 },
+            { id: 4, name: "大王椰子", icon: "🌴", location: "行政大樓", desc: "高聳挺拔的大王椰子樹是淡江精神象徵。隨著季節交替，老舊葉片與落果有掉落風險，你該如何處理？", choices: [{ text: "專業高空作業清除枯葉與落果，維護師生安全", correct: true }, { text: "為了省事將所有椰子樹頂端葉片全部剃光", correct: false }], active: true, x: 88, y: 20, speed: 0.75 },
+            { id: 5, name: "羊蹄甲", icon: "🌸", location: "福園草坪", desc: "福園環境清幽，落葉紛飛。校園園藝組正在推行生態永續，落葉應該如何處理最恰當？", choices: [{ text: "收集落葉進行就地堆肥，回饋土壤養分與維持地力", correct: true }, { text: "全部集中焚燒處理以免破壞草地美觀", correct: false }], active: true, x: 20, y: 32, speed: 0.6 },
+            { id: 6, name: "小花蔓澤蘭", icon: "⚠️", location: "覺生圖書館後山", desc: "外來入侵種「小花蔓澤蘭」有綠色沙漠之稱，生長迅速會覆蓋並扼殺淡江原生植物。正確防治方式是？", choices: [{ text: "在開花結實前進行人工拔除並集中銷毀", correct: true }, { text: "任其生長覆蓋山坡地以達到綠化效果", correct: false }], active: true, x: 42, y: 28, speed: 0.8 },
+            { id: 7, name: "黑板樹", icon: "🪵", location: "海事博物館旁", desc: "校園內的黑板樹樹冠廣大。每逢花期產生的氣味與淺根浮根特性，園藝組建議的長期管理方式為？", choices: [{ text: "適度修剪枝條並設置導根板保護步道結構", correct: true }, { text: "直接全面砍伐並改鋪水泥地", correct: false }], active: true, x: 62, y: 30, speed: 0.62 },
+            { id: 8, name: "樟樹群", icon: "🌳", location: "松濤館周邊", desc: "松濤館周邊的樟樹群散發清香且防蟲。面對淡江山坡地的多雨潮濕，如何維護樟樹健康？", choices: [{ text: "加強土壤排水孔疏通避免根系長期積水腐爛", correct: true }, { text: "在樹幹周圍灌注大量水泥固化土壤", correct: false }], active: true, x: 80, y: 15, speed: 0.58 },
+            { id: 9, name: "台灣欒樹", icon: "🍂", location: "文館前坡地", desc: "台灣欒樹隨季節展現翠綠、金黃到紅褐色蒴果的多變風貌。在季節交替時，正確的生態維護觀念是？", choices: [{ text: "保留落果與枯葉作為自然回饋生態鏈的一部分", correct: true }, { text: "用強力清潔劑清洗每一片葉子以保持鮮豔", correct: false }], active: true, x: 15, y: 25, speed: 0.72 },
+            { id: 10, name: "榕樹氣根", icon: "🌲", location: "驚聲大樓旁", desc: "驚聲大樓旁老榕樹生長出大量垂懸的氣生根。對於這些氣生根，校園園藝維護的正確觀念是？", choices: [{ text: "讓氣生根自然落地入土以支撐龐大樹冠與吸收養分", correct: true }, { text: "為了美觀將所有垂下的氣根全部剪斷", correct: false }], active: true, x: 35, y: 10, speed: 0.65 },
+            { id: 11, name: "艷紫荊", icon: "🌺", location: "宮燈大道花圃", desc: "艷紫荊花朵艷麗，吸引許多蜂蝶。花期過後的枝條修剪與病蟲害防治，應採取哪種作法？", choices: [{ text: "採取綜合生物防治並於花後適度修剪枯枝", correct: true }, { text: "大量噴灑廣效殺蟲劑殺滅所有昆蟲", correct: false }], active: true, x: 55, y: 25, speed: 0.68 },
+            { id: 12, name: "小葉欖仁", icon: "🌳", location: "溜冰場周邊", desc: "小葉欖仁樹形筆直優美。在校園鋪面臨近處，其淺根可能造成步道隆起，最佳處理方式是？", choices: [{ text: "設置根系導引板並適度調整周邊步道鋪面", correct: true }, { text: "直接砍斷主根以免破壞地磚", correct: false }], active: true, x: 75, y: 35, speed: 0.55 },
+            { id: 13, name: "青楓", icon: "🍁", location: "麗澤湖步道", desc: "麗澤湖步道旁的青楓在秋季轉紅。為了維持山坡地青楓林的微氣候與土壤保濕，應注意？", choices: [{ text: "保持林下腐植層完整，減少過度人工除草", correct: true }, { text: "將表土全部清除鋪上塑膠人工草皮", correct: false }], active: true, x: 25, y: 18, speed: 0.7 },
+            { id: 14, name: "山櫻花", icon: "🌸", location: "宮燈步道坡崁", desc: "淡江校園春季常能見到山櫻花綻放，吸引冠羽畫眉等鳥類。為維護鳥類棲息環境，園藝組建議？", choices: [{ text: "保留多樣化原生開花喬木，減少干擾鳥類覓食", correct: true }, { text: "為了採收方便將櫻花樹矮化並架設網子", correct: false }], active: true, x: 45, y: 35, speed: 0.75 },
+            { id: 15, name: "外來種埃及聖䴉", icon: "🦩", location: "校園水池邊", desc: "近期偶見外來鳥類埃及聖䴉出現於校園濕地水域，對本土鳥類生態造成競爭壓力。正確應對為？", choices: [{ text: "通報相關野生動物保育單位進行專業移除控管", correct: true }, { text: "餵食人類零食讓牠們留在校園與師生互動", correct: false }], active: true, x: 65, y: 12, speed: 0.82 },
+            { id: 16, name: "樟科植物群", icon: "🍃", location: "覺生綜合大樓", desc: "淡江校園內有豐富的樟科植物（如香楠、大葉楠），其落葉與枝幹具有天然芳香。如何善用落葉？", choices: [{ text: "現地覆蓋保持坡地水土，減少水分蒸發", correct: true }, { text: "全部清運至焚化爐燃燒處理", correct: false }], active: true, x: 85, y: 28, speed: 0.63 },
+            { id: 17, name: "構樹", icon: "🌿", location: "商管後山坡地", desc: "構樹是淡江山坡地常見的本土先驅樹種，生命力強且能快速綠化崩塌地。其生態價值在於？", choices: [{ text: "能迅速抓住土壤修復坡地，且其果實是鳥類美食", correct: true }, { text: "屬於有害雜木應全部剷除", correct: false }], active: true, x: 18, y: 15, speed: 0.69 },
+            { id: 18, name: "外來種荔枝椿象", icon: "🐞", location: "校園芒果樹林", desc: "外來害蟲荔枝椿象常在無患子科植物（如台灣欒樹）產卵危害。學校有機防治的正確方式是？", choices: [{ text: "引入平腹小蜂進行生物防治並避免徒手接觸", correct: true }, { text: "全面噴灑劇毒農藥將所有昆蟲趕盡殺絕", correct: false }], active: true, x: 52, y: 20, speed: 0.78 },
+            { id: 19, name: "台灣原生蕨類", icon: "🌿", location: "宮燈大道陰暗坡崁", desc: "宮燈大道兩側陰涼坡崁生長多種台灣本土蕨類，它們在淡江生態系統中的主要角色是？", choices: [{ text: "透過地下根莖緊密抓住山坡土壤，防止豪雨沖刷", correct: true }, { text: "會吸收所有地下水導致其他植物枯死", correct: false }], active: true, x: 38, y: 32, speed: 0.65 }
+        ];
+
+        let gameRunning = false;
+        let score = 0;
+        let hp = 100;
+        let clearedCount = 0;
+        let targetGoal = 10; // 需要答對 10 題通關
+        let shipX = 50; // 百分比
+        let lasers = [];
+        let keys = {};
+        let activeQuizTarget = null;
+        let isAnsweringLocked = false;
+
+        const container = document.getElementById('game-container');
+        const ship = document.getElementById('player-ship');
+        const enemiesLayer = document.getElementById('enemies-layer');
+        const lasersLayer = document.getElementById('lasers-layer');
+
+        // 監聽鍵盤與滑鼠觸控
+        window.addEventListener('keydown', e => {
+            keys[e.code] = true;
+            if (e.code === 'Space' && gameRunning && !activeQuizTarget && !isAnsweringLocked) {
+                e.preventDefault();
+                fireLaser();
+            }
+        });
+        window.addEventListener('keyup', e => keys[e.code] = false);
+
+        container.addEventListener('mousemove', e => {
+            if (!gameRunning || isAnsweringLocked) return;
+            const rect = container.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            shipX = Math.max(5, Math.min(95, (x / rect.width) * 100));
+            ship.style.left = `${shipX}%`;
+            ship.style.transform = `translateX(-50%)`;
+        });
+
+        container.addEventListener('click', () => {
+            if (gameRunning && !activeQuizTarget && !isAnsweringLocked) {
+                fireLaser();
+            }
+        });
+
+        // 觸控支援
+        container.addEventListener('touchmove', e => {
+            if (!gameRunning || isAnsweringLocked) return;
+            const rect = container.getBoundingClientRect();
+            const x = e.touches[0].clientX - rect.left;
+            shipX = Math.max(5, Math.min(95, (x / rect.width) * 100));
+            ship.style.left = `${shipX}%`;
+            ship.style.transform = `translateX(-50%)`;
+        });
+
+        function initGame() {
+            document.getElementById('screen-overlay').classList.add('hidden');
+            score = 0;
+            hp = 100;
+            clearedCount = 0;
+            isAnsweringLocked = false;
+            
+            // 隨機重置目標位置與啟用狀態
+            plantTargets.forEach(t => {
+                t.active = true;
+                t.y = 8 + Math.random() * 25;
+                t.x = 8 + Math.random() * 84;
+            });
+            lasers = [];
+            gameRunning = true;
+            updateHUD();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function fireLaser() {
+            lasers.push({ x: shipX, y: 80 });
+        }
+
+        function gameLoop() {
+            if (!gameRunning) return;
+
+            // 處理戰機左右鍵移動
+            if (keys['ArrowLeft'] || keys['KeyA']) {
+                shipX = Math.max(5, shipX - 1.8);
+            }
+            if (keys['ArrowRight'] || keys['KeyD']) {
+                shipX = Math.min(95, shipX + 1.8);
+            }
+            ship.style.left = `${shipX}%`;
+            ship.style.transform = `translateX(-50%)`;
+
+            // 更新目標位置（加快掉落速度）
+            plantTargets.forEach(t => {
+                if (!t.active) return;
+                t.y += t.speed * 0.25;
+                if (t.y > 78) {
+                    t.y = 8; // 循環掉落
+                }
+            });
+
+            // 更新雷射光束
+            if (!activeQuizTarget) {
+                for (let i = lasers.length - 1; i >= 0; i--) {
+                    lasers[i].y -= 3.5;
+                    if (lasers[i].y < 0) {
+                        lasers.splice(i, 1);
+                        continue;
+                    }
+
+                    // 碰撞檢測：檢查雷射是否擊中植物目標
+                    for (let t of plantTargets) {
+                        if (!t.active) continue;
+                        if (Math.abs(lasers[i].x - t.x) < 8 && Math.abs(lasers[i].y - t.y) < 12) {
+                            lasers.splice(i, 1);
+                            triggerQuiz(t);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            renderGameElements();
+
+            if (gameRunning) {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function renderGameElements() {
+            enemiesLayer.innerHTML = '';
+            plantTargets.forEach(t => {
+                if (!t.active) return;
+                const el = document.createElement('div');
+                el.className = 'absolute flex flex-col items-center transition-all duration-75 transform -translate-x-1/2 -translate-y-1/2';
+                el.style.left = `${t.x}%`;
+                el.style.top = `${t.y}%`;
+                el.innerHTML = `
+                    <div class="bg-slate-900/90 border-2 border-emerald-400/80 rounded-2xl px-3.5 py-1.5 flex items-center space-x-2 shadow-xl animate-bounce">
+                        <span class="text-2xl">${t.icon}</span>
+                        <div class="text-left">
+                            <span class="block text-xs font-black text-white">${t.name}</span>
+                            <span class="block text-[10px] text-emerald-300 font-semibold">${t.location}</span>
+                        </div>
+                    </div>
+                `;
+                enemiesLayer.appendChild(el);
+            });
+
+            lasersLayer.innerHTML = '';
+            lasers.forEach(l => {
+                const beam = document.createElement('div');
+                beam.className = 'absolute w-2 h-7 bg-sky-400 rounded-full shadow-[0_0_12px_#38bdf8] transform -translate-x-1/2';
+                beam.style.left = `${l.x}%`;
+                beam.style.top = `${l.y}%`;
+                lasersLayer.appendChild(beam);
+            });
+        }
+
+        function triggerQuiz(target) {
+            activeQuizTarget = target;
+            isAnsweringLocked = true;
+            document.getElementById('quiz-emoji').innerText = target.icon;
+            document.getElementById('quiz-heading').innerText = `💥 擊中【${target.name}】！生態挑戰`;
+            document.getElementById('quiz-text').innerText = target.desc;
+            
+            const feedbackEl = document.getElementById('quiz-feedback');
+            feedbackEl.classList.add('hidden');
+            feedbackEl.innerText = '';
+
+            const opts = document.getElementById('quiz-options');
+            opts.innerHTML = '';
+
+            target.choices.forEach(c => {
+                const btn = document.createElement('button');
+                btn.className = 'w-full bg-slate-800 hover:bg-sky-900/70 border border-white/20 hover:border-sky-400 text-slate-100 text-sm md:text-base font-medium p-3.5 rounded-2xl transition duration-200 text-left shadow flex items-center space-x-3';
+                btn.innerHTML = `<span class="text-sky-400 font-bold text-lg">👉</span><span>${c.text}</span>`;
+                btn.onclick = () => handleAnswer(c.correct, btn);
+                opts.appendChild(btn);
+            });
+
+            document.getElementById('combat-quiz').classList.remove('hidden');
+        }
+
+        function handleAnswer(isCorrect, selectedBtn) {
+            // 停用所有選項按鈕避免重複點擊
+            const allBtns = document.getElementById('quiz-options').querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            const feedbackEl = document.getElementById('quiz-feedback');
+            feedbackEl.classList.remove('hidden');
+
+            if (isCorrect) {
+                score += 20;
+                clearedCount++;
+                activeQuizTarget.active = false;
+                selectedBtn.classList.add('bg-emerald-700', 'border-emerald-400');
+                feedbackEl.className = 'mt-4 text-sm md:text-base font-bold text-emerald-400';
+                feedbackEl.innerText = `🎉 答對了！成功防護【${activeQuizTarget.name}】！`;
+                showNotification(`🎉 答對了！成功防護【${activeQuizTarget.name}】！`);
+            } else {
+                hp -= 20;
+                score = Math.max(0, score - 10);
+                selectedBtn.classList.add('bg-rose-700', 'border-rose-400');
+                feedbackEl.className = 'mt-4 text-sm md:text-base font-bold text-rose-400';
+                feedbackEl.innerText = `❌ 判斷失誤！防護罩受損 20%！`;
+                showNotification(`❌ 判斷失誤！戰機防護罩受損 20%！`);
+            }
+
+            updateHUD();
+
+            // 預留 1 秒讓玩家看清楚回饋後再關閉彈窗並繼續
+            setTimeout(() => {
+                document.getElementById('combat-quiz').classList.add('hidden');
+                isAnsweringLocked = false;
+                activeQuizTarget = null;
+
+                if (clearedCount >= targetGoal) {
+                    endGame(true);
+                } else if (hp <= 0) {
+                    endGame(false);
+                } else {
+                    // 重新隨機重生該目標位置避免卡在原地
+                    plantTargets.forEach(t => {
+                        if (!t.active && Math.random() > 0.5) {
+                            t.active = true;
+                            t.y = 8;
+                            t.x = 10 + Math.random() * 80;
+                        }
+                    });
+                }
+            }, 1000);
+        }
+
+        function showNotification(msg) {
+            const notif = document.createElement('div');
+            notif.className = 'absolute top-16 left-1/2 -translate-x-1/2 bg-slate-900/95 border-2 border-sky-400 text-sky-200 text-sm md:text-base font-bold px-5 py-2.5 rounded-2xl shadow-2xl z-50 animate-pulse';
+            notif.innerText = msg;
+            container.appendChild(notif);
+            setTimeout(() => notif.remove(), 1800);
+        }
+
+        function updateHUD() {
+            document.getElementById('score-val').innerText = `${score} 分`;
+            document.getElementById('targets-val').innerText = `${clearedCount} / ${targetGoal}`;
+            document.getElementById('hp-val').innerText = `${hp}%`;
+        }
+
+        function endGame(isWin) {
+            gameRunning = false;
+            isAnsweringLocked = false;
+            const overlay = document.getElementById('screen-overlay');
+            overlay.classList.remove('hidden');
+            overlay.innerHTML = `
+                <div class="bg-slate-900 text-slate-100 p-8 rounded-3xl max-w-lg shadow-2xl border-2 ${isWin ? 'border-sky-500' : 'border-rose-500'} turret-glow">
+                    <div class="text-6xl mb-4">${isWin ? '🏆🛸' : '💥🔥'}</div>
+                    <h2 class="text-3xl font-black mb-3 text-white">${isWin ? '任務成功！榮獲「淡江生態飛行王」！' : '戰機能量耗盡！防衛失敗'}</h2>
+                    <p class="text-sm md:text-base text-slate-300 mb-6 leading-relaxed">
+                        ${isWin ? `你成功駕駛戰機正確擊落並回答了 10 道淡江校園植物與生態考驗！總得分：${score} 分。你對淡江山坡植物與生態保護瞭如指掌！` : '由於答錯太多次導致戰機護盾歸零，未能完成淡江校園生態防衛任務。重整旗鼓再試一次吧！'}
+                    </p>
+                    <button onclick="initGame()" class="w-full ${isWin ? 'bg-sky-600 hover:bg-sky-500' : 'bg-rose-600 hover:bg-rose-500'} text-white font-bold py-3.5 px-6 rounded-2xl shadow-lg transition duration-200 text-base md:text-lg">
+                        ${isWin ? '再次挑戰高分 🚀' : '重新出發 🔄'}
+                    </button>
+                </div>
+            `;
+        }
+
+        async function fetchAiTip() {
+            const modal = document.getElementById('ai-modal');
+            const textEl = document.getElementById('ai-text');
+            modal.classList.remove('hidden');
+            textEl.innerText = "✨ Gemini 正在分析淡江校園山坡微氣候與植物防風保水策略...";
+
+            const systemPrompt = "你是一位淡江大學生態專家，請以生動繁體中文說明淡江大學因依山而建、多雨多風的地理環境，其校園植物（如宮燈榕樹、台灣海桐）如何扮演生態防護角色。";
+            const userQuery = "請提供一則淡江生態與植物保育的戰情提示。";
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] }
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                const candidate = result.candidates?.[0];
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    textEl.innerText = "💡 " + candidate.content.parts[0].text;
+                } else {
+                    textEl.innerText = "💡 淡江大學校園坐落於大屯山麓，常年受東北季風吹拂與山坡地形影響。校園內的台灣海桐與古榕樹群是天然的防風綠籬，能有效固土保水！";
+                }
+            } catch (err) {
+                textEl.innerText = "💡 淡江大學校園坐落於大屯山麓，常年受東北季風吹拂與山坡地形影響。校園內的台灣海桐與古榕樹群是天然的防風綠籬，能有效固土保水！";
+            }
+        }
+    </script>
+</body>
+</html>
